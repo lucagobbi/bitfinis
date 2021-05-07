@@ -5,17 +5,6 @@ from django.contrib.auth.models import User
 from app.models import Profile
 from django.contrib import messages
 
-def get_ip(request):
-
-    address = request.META.get('HTTP_X_FORWARDED_FOR')
-
-    if address:
-        ip = address.split(',')[-1].strip()
-    else:
-        ip = request.META.get('REMOTE_ADDR')
-
-    return ip
-
 
 def registration_view(request):
     if request.method == "POST":
@@ -46,10 +35,6 @@ def login_view(request):
 
         if user is not None:
             login(request, user)
-
-            # user_profile = Profile.objects.filter(user=user)
-            # user_profile(get_ip(request))
-            # user_profile.save()
 
             return HttpResponseRedirect("/")
 

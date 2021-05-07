@@ -11,8 +11,6 @@ class Profile(models.Model):
     BTC_wallet = models.FloatField(default=random.randint(1, 10))
     USD_wallet = models.FloatField(default=0)
     profit = models.FloatField(default=0)
-    ips = models.Field(default=[])
-    subprofiles = models.Field(default={})
 
 class Order(models.Model):
     CHOICES = (('BUY', 'BUY'), ('SELL', 'SELL'))
