@@ -18,9 +18,13 @@
       </button>
       <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+          <li class="nav-item">
+          <a class="nav-link active" aria-current="page" href="{% url 'registration_view' %}">Sign Up</a>
+        </li>
+          {% if request.user.is_authenticated %}
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-              Actions
+              {{ request.user.username }}
             </a>
             <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
               <li><a class="dropdown-item" href="{% url 'json_profile' %}">My Transactions</a></li>
@@ -29,6 +33,7 @@
               <li><a class="dropdown-item" href="{% url 'logout' %}">Logout</a></li>
             </ul>
           </li>
+          {% endif %}
         </ul>
       </div>
     </div>
