@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block head_title %}{{ block.super }} | Sign In{% endblock head_title %}
+
+{% block content %}
+
+    <div class="row justify-content-center mt-4">
+        <div class="col-6 text-center">
+            <h2>Sign Up!</h2>
+            <form method="POST" novalidate>
+                {% csrf_token %}
+                {{ form|crispy }}
+                <input type="submit" class="btn btn-info my-3" value="Create Account">
+            </form>
+        </div>
+    </div>
+
+{% endblock content %}

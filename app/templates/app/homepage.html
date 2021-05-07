@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="container">
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-warning my-3" role="alert">
+        <p class="my-3" id="messages">{{ message }}</p>
+    </div>
+    {% endfor %}
+    {% endif %}
+</div>
+
+{% for order in orders_list %}
+
+<div class="container">
+        <div class="card bg-light my-3">
+            <div class="card-header text-end">
+                <p class="text-muted mb-0">{{ order.datetime|date:"M d Y H:i" }}</p>
+            </div>
+            <div class="card-body">
+                <h5><span class="badge bg-success text-light my-2">@{{ order.profile.user.username }}</span></h5>
+                <p><strong>{{ order.position }}</strong> for {{ order.quantity }} BTC at {{ order.price }}$.</p>
+                <div class="text-end">
+                {% if order.status == 'open' %}<p class="badge bg-warning text-light my-2">{{ order.status }}</p>
+                {% else %}<p class="badge bg-danger text-light my-1">{{ order.status }}</p>{% endif %}</div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+{% endblock content %}
