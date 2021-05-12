@@ -19,7 +19,7 @@ def registration_view(request):
             profile = Profile.objects.get(user=user)
             login(request, user)
             messages.success(request,
-                             f'Your Account has been created successfully, you have received {profile.BTC_wallet} BTC as a welcome gift!')
+                             f'Your Account has been created successfully, you have received {profile.BTC_wallet} BTC and {profile.USD_wallet}$ as a welcome gift!')
             return HttpResponseRedirect("/")
     else:
         form = RegistrationForm()

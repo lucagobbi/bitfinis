@@ -12,11 +12,11 @@ from .utils import BitcoinBot
 # homepage with all orders
 def homepage(request):
 
-    #price = BitcoinBot().get_price()
-    #var_24h = BitcoinBot().get_var()
+    price = BitcoinBot().get_price()
+    var_24h = BitcoinBot().get_var()
     orders = Order.objects.all().order_by('-datetime')
     profile = Profile.objects.get(user=request.user)
-    context = {"orders": orders, "profile": profile,} #"price": price, "var_24h": var_24h}
+    context = {"orders": orders, "profile": profile, "price": price, "var_24h": var_24h}
 
     return render(request, "app/homepage.html", context)
 
@@ -100,9 +100,9 @@ def new_order_view(request):
                         buyer_profile.profit -= (open_sell_order.price * new_order.quantity)
                         seller_profile.profit += (open_sell_order.price * new_order.quantity)
 
+                        # current order is done
                         new_order.status = 'closed'
                         new_order.quantity = 0.0
-
 
                     seller_profile.save()
                     buyer_profile.save()
@@ -230,6 +230,7 @@ def user_profile_view(request, id):
     profile = Profile.objects.get(user=user)
     orders = Order.objects.filter(profile=profile).order_by('-datetime')
     transactions = Transaction.objects.filter(Q(buyer=request.user) | Q(seller=request.user)).order_by('-datetime')
+
     context = {"user": user, "profile": profile, "orders": orders, "transactions": transactions}
 
     return render(request, "app/profile.html", context)

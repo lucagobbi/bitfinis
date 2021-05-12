@@ -31,7 +31,7 @@
                 </div>
                 <div class="card-body">
                     <p>BTC/USD: {{ price }}$</p>
-                    <p>24h %: {{ var_24h }}%</p>
+                    <p>Percentage change 24h: {{ var_24h }}%</p>
                 </div>
             </div>
         </div>
@@ -57,8 +57,8 @@
                         </h5>
                     </div>
                     <div class="text-end">
-                        {% if order.status == 'open' %}<p class="badge bg-warning text-light my-2">{{ order.status }}</p>
-                        {% else %}<p class="badge bg-danger text-light my-1">{{ order.status }}</p>{% endif %}</div>
+                        {% if order.status == 'open' %}<p class="badge bg-warning text-light">{{ order.status }}</p>
+                        {% else %}<p class="badge bg-danger text-light">{{ order.status }}</p>{% endif %}</div>
                 </div>
             </div>
             {% empty %}
