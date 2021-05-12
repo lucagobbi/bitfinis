@@ -9,7 +9,7 @@ class Profile(models.Model):
     _id = ObjectIdField()
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     BTC_wallet = models.FloatField(default=random.randint(1, 10))
-    USD_wallet = models.FloatField(default=0)
+    USD_wallet = models.FloatField(default=10000)
     profit = models.FloatField(default=0)
 
 class Order(models.Model):

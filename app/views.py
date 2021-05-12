@@ -1,20 +1,24 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.models import User
 from django.contrib.auth.decorators import login_required
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Q
-from django.views.generic import ListView
 from .forms import OrderForm
 from .models import Order, Profile, Transaction
+from .utils import BitcoinBot
 
 # homepage with all orders
-class HomeView(LoginRequiredMixin, ListView):
-    queryset = Order.objects.all().order_by('-datetime')
-    template_name = "app/homepage.html"
-    context_object_name = "orders_list"
+def homepage(request):
 
+    #price = BitcoinBot().get_price()
+    #var_24h = BitcoinBot().get_var()
+    orders = Order.objects.all().order_by('-datetime')
+    profile = Profile.objects.get(user=request.user)
+    context = {"orders": orders, "profile": profile,} #"price": price, "var_24h": var_24h}
+
+    return render(request, "app/homepage.html", context)
 
 @login_required
 def new_order_view(request):
@@ -23,6 +27,11 @@ def new_order_view(request):
         form.save(commit=False)
         form.instance.user = request.user
         form.instance.profile = Profile.objects.get(user=request.user)
+
+        # avoid orders with negative prices or quantity
+        if form.instance.price < 0 or form.instance.quantity < 0:
+            messages.warning(request, 'You cannot place an order with negative values!')
+            return redirect("/new-order/")
 
         # check if user's USD wallet can cover the order
         if form.instance.position == 'BUY' and (form.instance.price * form.instance.quantity) > form.instance.profile.USD_wallet:
@@ -34,119 +43,130 @@ def new_order_view(request):
             messages.warning(request, 'You cannot sell more BTCs than you have!')
             return redirect("/new-order/")
 
-        # if user is submitting a BUY order and there is at least one SELL order with lower or equal price...
-        if form.instance.position == 'BUY' and Order.objects.filter(position='SELL', price__lte=form.instance.price, status='open').count() > 0:
-            print("Order matched!")
-            # get the first order that matches the condition
-            sell_order = Order.objects.filter(position='SELL', price__lte=form.instance.price, status='open').earliest('datetime')
-            seller_profile = Profile.objects.get(_id=sell_order.profile._id)
-            buyer_profile = Profile.objects.get(user=form.instance.user)
-            desidered_btc = form.instance.quantity
+        form.save()
+        messages.success(request, 'Your Order has been created successfully, please check your profile for involved transactions!')
 
-            # if the quantity on sale is less or equal than the desired quantity
-            if sell_order.quantity <= desidered_btc:
+        new_order = Order.objects.latest('datetime')
+        open_buy_orders = Order.objects.filter(position='BUY', status='open').exclude(profile=new_order.profile).order_by('-price')
+        open_sell_orders = Order.objects.filter(position='SELL', status='open').exclude(profile=new_order.profile).order_by('price')
 
-                buyer_profile.USD_wallet -= (float(sell_order.price) * float(sell_order.quantity))
-                buyer_profile.BTC_wallet += float(sell_order.quantity)
-                seller_profile.USD_wallet += (float(sell_order.price) * float(sell_order.quantity))
-                seller_profile.BTC_wallet -= float(sell_order.quantity)
-                # SELL order is done
-                sell_order.status = 'closed'
-                sell_order.save()
-                # update BUY order detracting BTCs sold
-                form.instance.quantity -= sell_order.quantity
-                # create Transaction
-                Transaction.objects.create(buyer=form.instance.user,
-                                           seller=seller_profile.user,
-                                           quantity=sell_order.quantity,
-                                           price=sell_order.price)
-                # calculate profit/loss for each part
-                buyer_profile.profit -= (sell_order.price * sell_order.quantity)
-                seller_profile.profit += (sell_order.price * sell_order.quantity)
+        # BUY order
+        if new_order.position == 'BUY' and open_sell_orders.count() > 0:
 
-                messages.success(request, 'Your Order has been created successfully and already involved transactions, please check your profile!')
+            for open_sell_order in open_sell_orders:
 
-            #  if the quantity on sale is greater than the desired quantity
-            else:
-                buyer_profile.USD_wallet -= (float(sell_order.price) * float(desidered_btc))
-                buyer_profile.BTC_wallet += float(desidered_btc)
-                seller_profile.USD_wallet += (float(sell_order.price) * float(desidered_btc))
-                seller_profile.BTC_wallet -= float(desidered_btc)
-                # BUY order is done
-                form.instance.status = 'closed'
-                # update SELL order detracting BTCs sold
-                sell_order.quantity -= float(desidered_btc)
-                sell_order.save()
-                # create Transaction
-                Transaction.objects.create(buyer=form.instance.user,
-                                           seller=seller_profile.user,
-                                           quantity=desidered_btc,
-                                           price=sell_order.price)
-                # calculate profit/loss for each party
-                buyer_profile.profit -= (sell_order.price * desidered_btc)
-                seller_profile.profit += (sell_order.price * desidered_btc)
+                if open_sell_order.price <= new_order.price:
+                    seller_profile = open_sell_order.profile
+                    buyer_profile = new_order.profile
 
-                messages.success(request, 'Your Order has been created successfully and already involved transactions, please check your profile!')
+                    # if the quantity on sale is less or equal than the desired quantity
+                    if open_sell_order.quantity <= new_order.quantity:
+                        buyer_profile.USD_wallet -= (open_sell_order.price * open_sell_order.quantity)
+                        buyer_profile.BTC_wallet += open_sell_order.quantity
+                        seller_profile.USD_wallet += (open_sell_order.price * open_sell_order.quantity)
+                        seller_profile.BTC_wallet -= open_sell_order.quantity
 
-            # if the order reach zero BTC quantity it is done
-            if form.instance.quantity == 0.0:
-                form.instance.status = 'closed'
+                        # update current order detracting BTC already sold
+                        new_order.quantity -= open_sell_order.quantity
+                        if new_order.quantity == 0.0:
+                            new_order.status = 'closed'
 
-            seller_profile.save()
-            buyer_profile.save()
-            form.save()
+                        Transaction.objects.create(buyer=buyer_profile.user,
+                                                   seller=seller_profile.user,
+                                                   quantity=open_sell_order.quantity,
+                                                   price=open_sell_order.price)
 
-        elif form.instance.position == 'SELL' and Order.objects.filter(position='BUY', price__gte=form.instance.price, status='open').count() > 0:
-            print("Order matched!")
-            buy_order = Order.objects.filter(position='BUY', price__gte=form.instance.price, status='open').earliest('datetime')
-            seller_profile = Profile.objects.get(user=form.instance.user)
-            buyer_profile = Profile.objects.get(_id=buy_order.profile._id)
-            btc_on_sale = form.instance.quantity
+                        buyer_profile.profit -= (open_sell_order.price * open_sell_order.quantity)
+                        seller_profile.profit += (open_sell_order.price * open_sell_order.quantity)
 
-            if buy_order.quantity <= btc_on_sale:
-                buyer_profile.USD_wallet -= (float(form.instance.price) * float(buy_order.quantity))
-                buyer_profile.BTC_wallet += float(buy_order.quantity)
-                seller_profile.USD_wallet += (float(form.instance.price) * float(buy_order.quantity))
-                seller_profile.BTC_wallet -= (float(buy_order.quantity))
-                buy_order.status = 'closed'
-                buy_order.save()
-                form.instance.quantity -= buy_order.quantity
-                Transaction.objects.create(buyer=buyer_profile.user,
-                                           seller=form.instance.user,
-                                           quantity=buy_order.quantity,
-                                           price=form.instance.price)
-                buyer_profile.profit -= form.instance.price * buy_order.quantity
-                seller_profile.profit += form.instance.price * buy_order.quantity
+                        # SELL order is done
+                        open_sell_order.status = 'closed'
+                        open_sell_order.quantity = 0.0
 
-                messages.success(request, 'Your Order has been created successfully and already involved transactions, please check your profile!')
+                    else:
+                        buyer_profile.USD_wallet -= (open_sell_order.price * new_order.quantity)
+                        buyer_profile.BTC_wallet += new_order.quantity
+                        seller_profile.USD_wallet += (open_sell_order.price * new_order.quantity)
+                        seller_profile.BTC_wallet -= new_order.quantity
 
-            else:
-                buyer_profile.USD_wallet -= (float(form.instance.price) * float(btc_on_sale))
-                buyer_profile.BTC_wallet += float(btc_on_sale)
-                seller_profile.USD_wallet += (float(form.instance.price) * float(btc_on_sale))
-                seller_profile.BTC_wallet -= (float(btc_on_sale))
-                form.instance.status = 'closed'
-                buy_order.quantity -= float(btc_on_sale)
-                buy_order.save()
-                Transaction.objects.create(buyer=buyer_profile.user,
-                                           seller=form.instance.user,
-                                           quantity=buy_order.quantity,
-                                           price=form.instance.price)
-                buyer_profile.profit -= form.instance.price * btc_on_sale
-                seller_profile.profit += form.instance.price * btc_on_sale
+                        # update SELL order detracting BTCs already bought
+                        open_sell_order.quantity -= new_order.quantity
 
-                messages.success(request, 'Your Order has been created successfully and already involved transactions, please check your profile!')
+                        Transaction.objects.create(buyer=new_order.profile.user,
+                                                   seller=seller_profile.user,
+                                                   quantity=new_order.quantity,
+                                                   price=open_sell_order.price)
 
-            if form.instance.quantity == 0.0:
-                form.instance.status = 'closed'
+                        buyer_profile.profit -= (open_sell_order.price * new_order.quantity)
+                        seller_profile.profit += (open_sell_order.price * new_order.quantity)
 
-            seller_profile.save()
-            buyer_profile.save()
-            form.save()
+                        new_order.status = 'closed'
+                        new_order.quantity = 0.0
 
-        else:
-            form.save()
-            messages.success(request, 'Your Order has been created successfully!')
+
+                    seller_profile.save()
+                    buyer_profile.save()
+                    new_order.save()
+                    open_sell_order.save()
+
+
+        # SELL order
+        if new_order.position == 'SELL' and open_buy_orders.count() > 0:
+
+            for open_buy_order in open_buy_orders:
+
+                if open_buy_order.price >= new_order.price:
+                    buyer_profile = open_buy_order.profile
+                    seller_profile = new_order.profile
+
+                    if open_buy_order.quantity <= new_order.quantity:
+                        buyer_profile.USD_wallet -= (open_buy_order.price * open_buy_order.quantity)
+                        buyer_profile.BTC_wallet += open_buy_order.quantity
+                        seller_profile.USD_wallet += (open_buy_order.price * open_buy_order.quantity)
+                        seller_profile.BTC_wallet -= open_buy_order.quantity
+
+                        # update current order detracting BTCs already bought
+                        new_order.quantity -= open_buy_order.quantity
+                        if new_order.quantity == 0.0:
+                            new_order.status = 'closed'
+
+                        Transaction.objects.create(buyer=buyer_profile.user,
+                                                   seller=seller_profile.user,
+                                                   quantity=open_buy_order.quantity,
+                                                   price=open_buy_order.price)
+
+                        buyer_profile.profit -= (open_buy_order.price * open_buy_order.quantity)
+                        seller_profile.profit += (open_buy_order.price * open_buy_order.quantity)
+
+                        # BUY order is done
+                        open_buy_order.status = 'closed'
+                        open_buy_order.quantity = 0.0
+
+                    else:
+                        buyer_profile.USD_wallet -= (open_buy_order.price * new_order.quantity)
+                        buyer_profile.BTC_wallet += new_order.quantity
+                        seller_profile.USD_wallet += (open_buy_order.price * new_order.quantity)
+                        seller_profile.BTC_wallet -= new_order.quantity
+
+                        # update BUY order detracting BTCs already sold
+                        open_buy_order.quantity -= new_order.quantity
+
+                        Transaction.objects.create(buyer=buyer_profile.user,
+                                                   seller=seller_profile.user,
+                                                   quantity=new_order.quantity,
+                                                   price=open_buy_order.price)
+
+                        buyer_profile.profit -= (new_order.price * new_order.quantity)
+                        seller_profile.profit += (new_order.price * new_order.quantity)
+
+                        # current order is done
+                        new_order.status = 'closed'
+                        new_order.quantity = 0.0
+
+                    seller_profile.save()
+                    buyer_profile.save()
+                    open_buy_order.save()
+                    new_order.save()
 
         return redirect("/")
 
@@ -188,7 +208,7 @@ def profit_and_losses_view(request):
     return JsonResponse(response, safe=False)
 
 # a view that returns all transactions related to a user
-def user_profile_json_view(request):
+def user_transactions_json_view(request):
     response = []
     transactions = Transaction.objects.filter(Q(buyer=request.user) | Q(seller=request.user))
     for transaction in transactions:
@@ -204,6 +224,15 @@ def user_profile_json_view(request):
 
     return JsonResponse(response, safe=False)
 
+# profile view with user current balance and history of orders/transactions
+def user_profile_view(request, id):
+    user = get_object_or_404(User, id=id)
+    profile = Profile.objects.get(user=user)
+    orders = Order.objects.filter(profile=profile).order_by('-datetime')
+    transactions = Transaction.objects.filter(Q(buyer=request.user) | Q(seller=request.user)).order_by('-datetime')
+    context = {"user": user, "profile": profile, "orders": orders, "transactions": transactions}
+
+    return render(request, "app/profile.html", context)
 
 
 

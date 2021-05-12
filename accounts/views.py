@@ -16,7 +16,10 @@ def registration_view(request):
             User.objects.create_user(username=username, password=password, email=email)
             user = authenticate(username=username, password=password)
             Profile.objects.create(user=user)
+            profile = Profile.objects.get(user=user)
             login(request, user)
+            messages.success(request,
+                             f'Your Account has been created successfully, you have received {profile.BTC_wallet} BTC as a welcome gift!')
             return HttpResponseRedirect("/")
     else:
         form = RegistrationForm()
@@ -39,7 +42,7 @@ def login_view(request):
             return HttpResponseRedirect("/")
 
         else:
-            messages.info(request, 'Username OR Password not correct.')
+            messages.warning(request, 'Username OR Password not correct.')
 
     context = {}
     return render(request, 'accounts/login.html')

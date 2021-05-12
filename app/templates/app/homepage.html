@@ -5,28 +5,75 @@
 <div class="container">
     {% if messages %}
     {% for message in messages %}
-    <div class="alert alert-warning my-3" role="alert">
+    <div class="alert alert-{{ message.tags }} my-3" role="alert">
         <p class="my-3" id="messages">{{ message }}</p>
     </div>
     {% endfor %}
     {% endif %}
 </div>
 
-{% for order in orders_list %}
-
 <div class="container">
-        <div class="card bg-light my-3">
-            <div class="card-header text-end">
-                <p class="text-muted mb-0">{{ order.datetime|date:"M d Y H:i" }}</p>
+    <div class="row">
+        <div class="col-sm-3">
+            <div class="card l-bg-blue-dark my-3">
+                <div class="card-header">
+                    <p class="my-0"><strong>Your Balance</strong></p>
+                </div>
+                <div class="card-body">
+                    <p>USD: {{ profile.USD_wallet }}$</p>
+                    <p>BTC: {{ profile.BTC_wallet }}BTC</p>
+                    <p>Profit: {{ profile.profit }}$</p>
+                </div>
             </div>
-            <div class="card-body">
-                <h5><span class="badge bg-success text-light my-2">@{{ order.profile.user.username }}</span></h5>
-                <p><strong>{{ order.position }}</strong> for {{ order.quantity }} BTC at {{ order.price }}$.</p>
-                <div class="text-end">
-                {% if order.status == 'open' %}<p class="badge bg-warning text-light my-2">{{ order.status }}</p>
-                {% else %}<p class="badge bg-danger text-light my-1">{{ order.status }}</p>{% endif %}</div>
+            <div class="card l-bg-blue-dark my-3">
+                <div class="card-header">
+                    <p class="my-0"><strong>Bitcoin Overview</strong></p>
+                </div>
+                <div class="card-body">
+                    <p>BTC/USD: {{ price }}$</p>
+                    <p>24h %: {{ var_24h }}%</p>
+                </div>
             </div>
         </div>
+
+        <div class="col-sm-9">
+            {% for order in orders %}
+            <div class="card l-bg-green-dark my-3">
+                <div class="card-header" style="display: flex; justify-content: space-between;">
+                    <h5>@{{ order.profile.user.username }}</h5><p class="text-white mb-0">{{ order.datetime|date:"M d Y H:m:s" }}</p>
+                </div>
+                <div class="card-statistic-3 p-4">
+                    {% if order.position == 'BUY' %}
+                    <div class="card-icon card-icon-large"><i class="fas fa-shopping-cart"></i></div>
+                    {% else %}
+                    <div class="card-icon card-icon-large"><i class="fas fa-dollar-sign"></i></div>
+                    {% endif %}
+                    <div class="mb-4">
+                        <h4 class="card-title mb-0">{{ order.position }}</h4>
+                    </div>
+                    <div class="row align-items-center mb-2 d-flex">
+                        <h5 class="d-flex align-items-center mb-0">
+                            for {{ order.quantity }} BTC at {{ order.price }}$
+                        </h5>
+                    </div>
+                    <div class="text-end">
+                        {% if order.status == 'open' %}<p class="badge bg-warning text-light my-2">{{ order.status }}</p>
+                        {% else %}<p class="badge bg-danger text-light my-1">{{ order.status }}</p>{% endif %}</div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="card bg-light my-3">
+                <div class="card-body">
+                    <p>No Active Orders</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
     </div>
-    {% endfor %}
+</div>
+</div>
+
+
+
+
 {% endblock content %}
