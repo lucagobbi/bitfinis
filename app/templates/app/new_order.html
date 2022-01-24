@@ -1,32 +1,53 @@
-{% extends 'base.html' %}
-{% load crispy_forms_tags %}
-
-{% block head_title %}{{ block.super }} | New Order{% endblock head_title %}
-
-{% block content %}
+{% extends 'base.html' %} {% load static %} {% block head_title %}{{ block.super }} | New
+Order{%endblock head_title %} {% block content %}
 
 <div class="row justify-content-center mt-4">
-    <div class="col-6 text-center">
-        <h2>New Order</h2>
-        <form method="POST" novalidate>
-            {% csrf_token %}
-            {{ form|crispy }}
-            <input type="submit" class="btn btn-success my-3" value="Send">
-        </form>
-    </div>
-    </div>
+  <div class="col-6 text-center">
+    <h2>New Order</h2>
+    <form method="POST" novalidate>
+      {% csrf_token %} 
+      <div class="form-group my-3">
+        <label for="">Position</label>
+        {{ form.position }}
+      </div>
+      <div class="form-group my-3">
+        <label for="">Quantity</label>
+        {{ form.quantity }}
+      </div>
+      <div class="form-group my-3" id="priceForm">
+        <label for="">Price</label>
+        {{ form.price }}
+      </div>
+      <div class="form-check my-2">
+        <input type="checkbox" name="{{ form.market_price.html_name }}" id="{{ form.market_price.id_for_label }}" class="some-custom-class">
+        <label for="{{ form.market_price.id_for_label }}">Market Price</label>
+      </div>
+      <input type="submit" class="btn btn-success my-3" value="Send" />
+    </form>
+  </div>
+</div>
 
-    <div class="container">
-    {% if messages %}
-    {% for message in messages %}
-        <div class="alert alert-{{ message.tags }} my-3" role="alert">
-            <p class="my-3" id="messages">{{ message }}</p>
-        </div>
-    {% endfor %}
-    {% endif %}
-    </div>
+<div class="container">
+  {% if messages %} {% for message in messages %}
+  <div class="alert alert-{{ message.tags }} my-3" role="alert">
+    <p class="my-3" id="messages">{{ message }}</p>
+  </div>
+  {% endfor %} {% endif %}
+</div>
 
 
+<script>
 
+let marketPrice = document.getElementById('id_market_price')
+console.log(marketPrice)
+let priceForm = document.getElementById('priceForm')
+console.log(priceForm)
+
+marketPrice.onclick = function() {
+  priceForm.style.display = this.checked ? 'none' : 'block';
+}
+
+
+</script>
 
 {% endblock content %}
